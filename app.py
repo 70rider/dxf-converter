@@ -9,12 +9,21 @@ import io, os, base64
 import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 
-# 1. 準備
+# --- 1. 準備 (app.py の冒頭部分をこれに差し替え) ---
 SD = "temp_assets"
-if not os.path.exists(SD): os.makedirs(SD)
+if not os.path.exists(SD):
+    os.makedirs(SD)
+
 GP = os.path.join(SD, "guide.png")
-st.set_page_config(page_title="DXF Cam", layout="centered")
-st.title("DXFカメラガイド")
+
+# もしGitHubからコピーされたファイルがなくても、エラーにならないようチェック
+if not os.path.exists(GP):
+    # 透明な1x1ピクセルの画像を作成して保存しておく
+    try:
+        empty_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+        empty_img.save(GP)
+    except:
+        pass
 
 # 2. DXF変換ロジック
 st.header("1. 図面の準備")
@@ -97,3 +106,4 @@ h += "</script>"
 final_h = h.replace("REPLACE", gs)
 components.html(final_h, height=850)
 if st.button("🔄 表示を更新"): st.rerun()
+
