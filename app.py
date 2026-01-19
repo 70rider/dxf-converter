@@ -38,7 +38,7 @@ if up:
         st.success("図面保存完了")
     except Exception as e: st.error(f"Error: {e}")
 
-# 3. HTML (合成計算の修正)
+# 3. HTML (合成計算を「画面座標系」から「カメラ座標系」へ変換)
 gs = ""
 if os.path.exists(GP):
     with open(GP, "rb") as f:
@@ -60,22 +60,28 @@ h += "<canvas id='c' style='display:none;'></canvas><script>"
 h += "let s=0.8,x=0,y=0;const g=document.getElementById('g'),v=document.getElementById('v'),ar=document.getElementById('ar'),st=document.getElementById('st');"
 h += "function up(){g.style.transform='translate(calc(-50% + '+x+'px),calc(-50% + '+y+'px)) scale('+s+')';}"
 h += "st.onclick=()=>{navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920}}}).then(m=>{v.srcObject=m;ar.style.display='block';st.style.display='none';});};"
-h += "document.getElementById('zi').onclick=()=>{s+=0.05;up();}; document.getElementById('zo').onclick=()=>{s-=0.05;up();};"
-h += "document.getElementById('u').onclick=()=>{y-=10;up();}; document.getElementById('d').onclick=()=>{y+=10;up();};"
-h += "document.getElementById('l').onclick=()=>{x-=10;up();}; document.getElementById('r').onclick=()=>{x+=10;up();};"
+h += "document.getElementById('zi').onclick=()=>{s+=0.1;up();}; document.getElementById('zo').onclick=()=>{s-=0.1;up();};"
+h += "document.getElementById('u').onclick=()=>{y-=15;up();}; document.getElementById('d').onclick=()=>{y+=15;up();};"
+h += "document.getElementById('l').onclick=()=>{x-=15;up();}; document.getElementById('r').onclick=()=>{x+=15;up();};"
 h += "document.getElementById('rs').onclick=()=>{s=0.8;x=0;y=0;up();};"
 
-# 保存時のスケール計算ロジック
+# 【重要】撮影・合成ロジック
 h += "document.getElementById('sht').onclick=()=>{const c=document.getElementById('c'),t=c.getContext('2d');"
 h += "c.width=v.videoWidth;c.height=v.videoHeight;t.drawImage(v,0,0);"
 h += "if(g.src.includes('base64')){"
+# 1. 画面上の表示倍率（画面幅に対するカメラ解像度の比）を算出
 h += "let ratio = v.videoWidth / ar.offsetWidth;"
-h += "let drawW = c.width * s;"
-h += "let drawH = g.naturalHeight * (drawW / g.naturalWidth);"
-h += "let offX = (c.width - drawW) / 2 + (x * ratio);"
-h += "let offY = (c.height - drawH) / 2 + (y * ratio);"
+# 2. ガイド画像の元のサイズを取得
+h += "let nw = g.naturalWidth; let nh = g.naturalHeight;"
+# 3. 保存時の描画サイズを計算（基本サイズ × 拡大率s × 比率ratio）
+# ※ 画面上で「scale(0.8)」が基準なので、それを考慮
+h += "let drawW = (ar.offsetWidth * s) * ratio;"
+h += "let drawH = nh * (drawW / nw);"
+# 4. 中心座標を計算（移動分x, yを比率で補正）
+h += "let offX = (c.width / 2) + (x * ratio) - (drawW / 2);"
+h += "let offY = (c.height / 2) + (y * ratio) - (drawH / 2);"
 h += "t.globalAlpha=0.5; t.drawImage(g, offX, offY, drawW, drawH);}"
-h += "const a=document.createElement('a');a.download='pic.png';a.href=c.toDataURL();a.click();};</script>"
+h += "const a=document.createElement('a');a.download='pic.png';a.href=c.toDataURL('image/png');a.click();};</script>"
 
 components.html(h.replace("REPLACE", gs), height=850)
 if st.button("🔄 表示を更新"): st.rerun()
