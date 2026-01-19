@@ -6,99 +6,100 @@ from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 from PIL import Image, ImageOps
 import io
-import matplotlib.pyplot as plt
-import base64  # ← これを忘れずに追加
-import streamlit.components.v1 as components  # ← これも追加
+import os
+import base64
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="DXF to 透明PNG & カメラガイド", layout="centered")
+# 保存用フォルダの作成（サーバー上に一時保存）
+SAVE_DIR = "shared_assets"
+if not os.path.exists(SAVE_DIR):
+    os.makedirs(SAVE_DIR)
 
-st.title("DXFカメラガイドツール")
-st.write("1. DXFをアップロードしてPNG変換 2. カメラで重ね合わせ撮影")
+GUIDE_PATH = os.path.join(SAVE_DIR, "guide_image.png")
 
-uploaded_file = st.file_uploader("DXFファイルを選択してください", type=['dxf'])
+st.set_page_config(page_title="DXF連携カメラ", layout="centered")
 
-if uploaded_file is not None:
-    try:
-        # --- 1. DXF読み込み ---
-        file_bytes = uploaded_file.getvalue()
-        stream = io.BytesIO(file_bytes)
-        doc, auditor = recover.read(stream)
-        if auditor.has_errors:
-            auditor.fix()
+# サイドバーでモード切り替え
+mode = st.sidebar.radio("モード選択", ["PC：図面アップロード", "スマホ：カメラ撮影"])
 
-        # --- 2. DXFから画像への描画 ---
-        fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_axes([0, 0, 1, 1])
-        ctx = RenderContext(doc)
-        out = MatplotlibBackend(ax)
-        Frontend(ctx, out).draw_layout(doc.modelspace())
+# --- モード1：PCでアップロード ---
+if mode == "PC：図面アップロード":
+    st.title("📁 図面アップロード (PC)")
+    st.write("ここでDXFをアップロードすると、スマホ側に反映されます。")
+    
+    uploaded_file = st.file_uploader("DXFファイルを選択", type=['dxf'])
+    
+    if uploaded_file is not None:
+        try:
+            # 1. DXF変換ロジック
+            file_bytes = uploaded_file.getvalue()
+            doc, auditor = recover.read(io.BytesIO(file_bytes))
+            if auditor.has_errors: auditor.fix()
+            
+            import matplotlib.pyplot as plt
+            fig = plt.figure(figsize=(10, 10))
+            ax = fig.add_axes([0, 0, 1, 1])
+            ctx = RenderContext(doc)
+            out = MatplotlibBackend(ax)
+            Frontend(ctx, out).draw_layout(doc.modelspace())
+            
+            # PNG変換
+            img_buf = io.BytesIO()
+            fig.savefig(img_buf, format='png', bbox_inches='tight', pad_inches=0, dpi=300)
+            plt.close(fig)
+            
+            # 2. 透明化加工
+            im = Image.open(img_buf).convert('RGB')
+            im_inverted = ImageOps.invert(im)
+            alpha = im_inverted.convert("L").point(lambda x: 255 if x < 128 else 0)
+            im_inverted.putalpha(alpha)
+            
+            # 3. サーバーに保存（スマホで読み込むため）
+            im_inverted.save(GUIDE_PATH)
+            st.success("図面をサーバーに保存しました！スマホで「撮影モード」を開いてください。")
+            st.image(im_inverted, caption="現在のガイド画像", width=300)
+            
+        except Exception as e:
+            st.error(f"エラー: {e}")
+
+# --- モード2：スマホで撮影 ---
+else:
+    st.title("📸 カメラ撮影 (スマホ)")
+    
+    if not os.path.exists(GUIDE_PATH):
+        st.warning("まだ図面がアップロードされていません。PCでアップロードしてください。")
+    else:
+        st.info("PCでアップロードされた最新の図面を読み込みました。")
         
-        img_buf = io.BytesIO()
-        fig.savefig(img_buf, format='png', bbox_inches='tight', pad_inches=0, dpi=300)
-        plt.close(fig)
-        
-        # --- 3. Pillowによる画像加工 ---
-        img_buf.seek(0)
-        im = Image.open(img_buf).convert('RGB')
-        im_inverted = ImageOps.invert(im)
-        l_channel = im_inverted.convert("L")
-        alpha = l_channel.point(lambda x: 255 if x < 128 else 0)
-        final_im = im_inverted.copy()
-        final_im.putalpha(alpha)
-        
-        # --- 4. 結果の表示とダウンロード ---
-        st.divider()
-        st.image(final_im, caption="変換後のガイド画像（背景透明）", use_container_width=True)
-        
-        out_buf = io.BytesIO()
-        final_im.save(out_buf, format="PNG")
-        st.download_button(label="PNG画像をダウンロード", data=out_buf.getvalue(), file_name=f"{uploaded_file.name}.png", mime="image/png")
+        # 保存された画像をBase64に変換
+        with open(GUIDE_PATH, "rb") as f:
+            img_str = base64.b64encode(f.read()).decode()
 
-        # --- 5. カメラガイド機能（HTML/JS） ---
-        st.subheader("📸 実地撮影モード")
-        st.info("スマホでアクセスすると、この図面をカメラに重ねて撮影できます。")
-
-        # 画像をBase64に変換してHTMLに埋め込む
-        buffered = io.BytesIO()
-        final_im.save(buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode()
-
+        # カメラHTML（前回のものを使用）
         camera_html = f"""
-        <div style="position: relative; width: 100%; max-width: 500px; margin: auto; border: 2px solid #333; border-radius: 10px; overflow: hidden; background: #000;">
-            <video id="video" autoplay playsinline style="width: 100%; display: block;"></video>
+        <div style="position: relative; width: 100%; max-width: 500px; margin: auto; background: #000;">
+            <video id="video" autoplay playsinline style="width: 100%;"></video>
             <img id="guide" src="data:image/png;base64,{img_str}" 
                  style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; opacity: 0.5; pointer-events: none;">
-            <div id="shutter" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; background: #fff; border-radius: 50%; border: 5px solid rgba(255,255,255,0.5); cursor: pointer; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>
+            <div id="shutter" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; background: #fff; border-radius: 50%; border: 5px solid #ccc; cursor: pointer;"></div>
         </div>
         <canvas id="canvas" style="display:none;"></canvas>
-
         <script>
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
             const shutter = document.getElementById('shutter');
             const guide = document.getElementById('guide');
-
             navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "environment" }}, audio: false }})
             .then(stream => {{ video.srcObject = stream; }})
-            .catch(err => {{ alert("カメラの起動に失敗しました。HTTPS環境（Streamlit Cloud等）で試してください。"); }});
-
+            .catch(err => {{ alert("カメラ起動失敗"); }});
             shutter.addEventListener('click', () => {{
                 const ctx = canvas.getContext('2d');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                
-                // 1. 背景（カメラ映像）を描画
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // 2. ガイド（図面）を重ねる
-                const guideWidth = canvas.width * 0.8;
-                const guideHeight = guide.naturalHeight * (guideWidth / guide.naturalWidth);
-                const x = (canvas.width - guideWidth) / 2;
-                const y = (canvas.height - guideHeight) / 2;
+                const gw = canvas.width * 0.8;
+                const gh = guide.naturalHeight * (gw / guide.naturalWidth);
                 ctx.globalAlpha = 0.5;
-                ctx.drawImage(guide, x, y, guideWidth, guideHeight);
-                
-                // 3. 保存
+                ctx.drawImage(guide, (canvas.width-gw)/2, (canvas.height-gh)/2, gw, gh);
                 const link = document.createElement('a');
                 link.download = 'field_photo.png';
                 link.href = canvas.toDataURL('image/png');
@@ -106,8 +107,7 @@ if uploaded_file is not None:
             }});
         </script>
         """
-        # HTMLを表示
-        components.html(camera_html, height=650)
-
-    except Exception as e:
-        st.error(f"エラーが発生しました: {e}")
+        components.html(camera_html, height=600)
+        
+        if st.button("最新の状態に更新"):
+            st.rerun()
