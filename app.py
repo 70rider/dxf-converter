@@ -17,7 +17,7 @@ if not os.path.exists(GP):
     try: Image.new('RGBA', (1,1), (0,0,0,0)).save(GP)
     except: pass
 
-st.title("DXFカメラツール (iPhone対応版)")
+st.title("DXFカメラ (iPhone完全対応版)")
 
 # 2. DXF変換
 up = st.file_uploader("DXFを選択", type=['dxf'])
@@ -38,7 +38,7 @@ if up:
         st.success("図面保存完了")
     except Exception as e: st.error(f"Error: {e}")
 
-# 3. HTML/JS（iOSの解像度バグ対策版）
+# 3. HTML/JS（iPhoneの画面比率を強制同期）
 gs = ""
 if os.path.exists(GP):
     with open(GP, "rb") as f:
@@ -63,27 +63,30 @@ h += "<canvas id='c' style='display:none;'></canvas><script>"
 h += "let s=0.8,x=0,y=0;const g=document.getElementById('g'),v=document.getElementById('v'),ar=document.getElementById('ar'),st=document.getElementById('st');"
 h += "function up(){g.style.transform='translate(calc(-50% + '+x+'px),calc(-50% + '+y+'px)) scale('+s+')';}"
 h += "st.onclick=()=>{navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}}}).then(m=>{v.srcObject=m;ar.style.display='block';st.style.display='none';});};"
-h += "document.getElementById('zi').onclick=()=>{s+=0.1;up();}; document.getElementById('zo').onclick=()=>{s-=0.1;up();};"
-h += "document.getElementById('u').onclick=()=>{y-=15;up();}; document.getElementById('d').onclick=()=>{y+=15;up();};"
-h += "document.getElementById('l').onclick=()=>{x-=15;up();}; document.getElementById('r').onclick=()=>{x+=15;up();};"
+h += "document.getElementById('zi').onclick=()=>{s+=0.2;up();}; document.getElementById('zo').onclick=()=>{s-=0.2;up();};"
+h += "document.getElementById('u').onclick=()=>{y-=20;up();}; document.getElementById('d').onclick=()=>{y+=20;up();};"
+h += "document.getElementById('l').onclick=()=>{x-=20;up();}; document.getElementById('r').onclick=()=>{x+=20;up();};"
 h += "document.getElementById('rs').onclick=()=>{s=0.8;x=0;y=0;up();};"
 
-# 【iPhone向け修正】ビデオの表示サイズと内部解像度のズレを吸収
+# 【iPhone Retinaディスプレイ完全補正ロジック】
 h += "document.getElementById('sht').onclick=()=>{const c=document.getElementById('c'),t=c.getContext('2d');"
 h += "const vw=v.videoWidth; const vh=v.videoHeight;"
-# 表示上の縦横比を維持してキャンバスを作成
 h += "c.width=vw; c.height=vh; t.drawImage(v,0,0);"
 h += "if(g.src.includes('base64')){"
-# iPhoneのSafariでも正確に比率を出すためにビデオ要素の表示幅を使用
-h += "  let rect = v.getBoundingClientRect();"
-h += "  let ratio = vw / rect.width;"
-h += "  let finalW = (rect.width * s) * ratio;"
-h += "  let finalH = g.naturalHeight * (finalW / g.naturalWidth);"
-h += "  let drawX = (vw / 2) + (x * ratio) - (finalW / 2);"
-h += "  let drawY = (vh / 2) + (y * ratio) - (finalH / 2);"
-h += "  t.globalAlpha=0.5; t.drawImage(g, drawX, drawY, finalW, finalH);"
+# iPhoneの画面上の「見えているガイドの幅」をピクセルで取得
+h += "  const gRect = g.getBoundingClientRect();"
+h += "  const vRect = v.getBoundingClientRect();"
+# ビデオの解像度と表示サイズの比率
+h += "  const ratio = vw / vRect.width;"
+# 見えている通りの幅・高さを計算
+h += "  const drawW = gRect.width * ratio;"
+h += "  const drawH = gRect.height * ratio;"
+# 見えている通りの位置（ビデオの中心からのズレ）を計算
+h += "  const drawX = (vw / 2) + (x * ratio) - (drawW / 2);"
+h += "  const drawY = (vh / 2) + (y * ratio) - (drawH / 2);"
+h += "  t.globalAlpha=0.5; t.drawImage(g, drawX, drawY, drawW, drawH);"
 h += "}"
-h += "const a=document.createElement('a');a.download='pic.png';a.href=c.toDataURL('image/png');a.click();};</script>"
+h += "const a=document.createElement('a');a.download='result.png';a.href=c.toDataURL('image/png');a.click();};</script>"
 
 components.html(h.replace("REPLACE", gs), height=850)
 if st.button("🔄 表示を更新"): st.rerun()
