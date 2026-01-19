@@ -17,9 +17,9 @@ if not os.path.exists(GP):
     try: Image.new('RGBA', (1,1), (0,0,0,0)).save(GP)
     except: pass
 
-st.title("DXFカメラツール")
+st.title("DXFカメラツール (iPhone対応版)")
 
-# 2. DXF変換ロジック
+# 2. DXF変換
 up = st.file_uploader("DXFを選択", type=['dxf'])
 if up:
     try:
@@ -38,7 +38,7 @@ if up:
         st.success("図面保存完了")
     except Exception as e: st.error(f"Error: {e}")
 
-# 3. HTML/JS（保存サイズを画面に100%合わせるロジック）
+# 3. HTML/JS（iOSの解像度バグ対策版）
 gs = ""
 if os.path.exists(GP):
     with open(GP, "rb") as f:
@@ -47,7 +47,7 @@ if os.path.exists(GP):
 h = "<style>"
 h += ".grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;width:280px;margin:auto;}"
 h += ".btn{background:#eee;border:1px solid #999;padding:15px;border-radius:5px;text-align:center;cursor:pointer;font-weight:bold;}"
-h += "#sht{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:75px;height:75px;background:rgba(255,255,255,0.4);border-radius:50%;border:5px solid #fff;z-index:10;}"
+h += "#sht{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:70px;height:70px;background:rgba(255,255,255,0.4);border-radius:50%;border:5px solid #fff;z-index:10;}"
 h += "</style>"
 h += "<button id='st' style='width:100%;padding:20px;background:red;color:#fff;border:none;border-radius:10px;'>📸 カメラ起動</button>"
 h += "<div id='ar' style='display:none;position:relative;width:100%;background:#000;overflow:hidden;margin-top:10px;border-radius:15px;'>"
@@ -62,22 +62,23 @@ h += "<div></div><div class='btn' id='d'>⬇️</div><div></div></div></div>"
 h += "<canvas id='c' style='display:none;'></canvas><script>"
 h += "let s=0.8,x=0,y=0;const g=document.getElementById('g'),v=document.getElementById('v'),ar=document.getElementById('ar'),st=document.getElementById('st');"
 h += "function up(){g.style.transform='translate(calc(-50% + '+x+'px),calc(-50% + '+y+'px)) scale('+s+')';}"
-h += "st.onclick=()=>{navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920}}}).then(m=>{v.srcObject=m;ar.style.display='block';st.style.display='none';});};"
+h += "st.onclick=()=>{navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}}}).then(m=>{v.srcObject=m;ar.style.display='block';st.style.display='none';});};"
 h += "document.getElementById('zi').onclick=()=>{s+=0.1;up();}; document.getElementById('zo').onclick=()=>{s-=0.1;up();};"
 h += "document.getElementById('u').onclick=()=>{y-=15;up();}; document.getElementById('d').onclick=()=>{y+=15;up();};"
 h += "document.getElementById('l').onclick=()=>{x-=15;up();}; document.getElementById('r').onclick=()=>{x+=15;up();};"
 h += "document.getElementById('rs').onclick=()=>{s=0.8;x=0;y=0;up();};"
 
-# 保存時の計算ロジック（ここを根本から修正）
+# 【iPhone向け修正】ビデオの表示サイズと内部解像度のズレを吸収
 h += "document.getElementById('sht').onclick=()=>{const c=document.getElementById('c'),t=c.getContext('2d');"
-h += "const vw=v.videoWidth, vh=v.videoHeight; c.width=vw; c.height=vh; t.drawImage(v,0,0);"
+h += "const vw=v.videoWidth; const vh=v.videoHeight;"
+# 表示上の縦横比を維持してキャンバスを作成
+h += "c.width=vw; c.height=vh; t.drawImage(v,0,0);"
 h += "if(g.src.includes('base64')){"
-# 画面の幅とカメラの解像度の比率を計算
-h += "  let ratio = vw / ar.offsetWidth;"
-# ガイドの「現在の画面上でのサイズ」を算出し、それを比率で写真サイズに変換
-h += "  let finalW = (ar.offsetWidth * s) * ratio;"
+# iPhoneのSafariでも正確に比率を出すためにビデオ要素の表示幅を使用
+h += "  let rect = v.getBoundingClientRect();"
+h += "  let ratio = vw / rect.width;"
+h += "  let finalW = (rect.width * s) * ratio;"
 h += "  let finalH = g.naturalHeight * (finalW / g.naturalWidth);"
-# 座標の計算（画面中央を基準に移動量を加算）
 h += "  let drawX = (vw / 2) + (x * ratio) - (finalW / 2);"
 h += "  let drawY = (vh / 2) + (y * ratio) - (finalH / 2);"
 h += "  t.globalAlpha=0.5; t.drawImage(g, drawX, drawY, finalW, finalH);"
