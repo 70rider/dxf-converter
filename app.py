@@ -19,10 +19,9 @@ GUIDE_PATH = os.path.join(SAVE_DIR, "current_guide.png")
 
 st.set_page_config(page_title="DXF Camera Tool", layout="centered")
 
-st.title("DXFカメラガイドツール")
+st.title("DXFカメラガイド（調整機能付）")
 
-# --- セクション1：図面のアップロード ---
-st.header("1. 図面の準備")
+# --- 1. 図面の準備 ---
 uploaded_file = st.file_uploader("PCからDXFをアップロード", type=['dxf'])
 
 if uploaded_file is not None:
@@ -54,77 +53,83 @@ if uploaded_file is not None:
 
 st.divider()
 
-# --- セクション2：カメラ起動ボタン ---
-st.header("2. 現場撮影")
-
-# ガイド画像データの準備
+# --- 2. カメラ撮影 & 調整 UI ---
 if os.path.exists(GUIDE_PATH):
     with open(GUIDE_PATH, "rb") as f:
         img_str = base64.b64encode(f.read()).decode()
     guide_src = f"data:image/png;base64,{img_str}"
 else:
-    # 図面がない場合のダミー透過画像
     guide_src = ""
 
-# カメラ起動を制御するボタン（StreamlitのボタンではなくHTML内のボタンで完結させます）
 camera_ui_html = f"""
-<div style="text-align: center; margin-bottom: 20px;">
-    <button id="start-camera" style="background-color: #ff4b4b; color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%;">
-        📸 カメラを起動して撮影する
-    </button>
+<style>
+    .controls {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 300px; margin: 20px auto; }}
+    .btn {{ background: #f0f2f6; border: 1px solid #ccc; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; user-select: none; }}
+    .btn:active {{ background: #ddd; }}
+    .zoom-controls {{ display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }}
+    #shutter {{ width: 70px; height: 70px; background: #ff4b4b; border-radius: 50%; border: 5px solid white; margin: 20px auto; cursor: pointer; }}
+</style>
+
+<div style="text-align: center;">
+    <button id="start-camera" style="background: #ff4b4b; color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 18px; width: 100%;">📸 カメラ起動</button>
 </div>
 
-<div id="camera-container" style="display: none; position: relative; width: 100%; max-width: 500px; margin: auto; border-radius: 15px; overflow: hidden; background: #000;">
+<div id="camera-container" style="display: none; position: relative; width: 100%; max-width: 500px; margin: auto; overflow: hidden; background: #000; border-radius: 15px;">
     <video id="video" autoplay playsinline style="width: 100%; display: block;"></video>
     <img id="guide" src="{guide_src}" 
-         style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; opacity: 0.5; pointer-events: none;">
-    <div id="shutter" style="position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); width: 70px; height: 70px; background: #fff; border-radius: 50%; border: 6px solid rgba(255,255,255,0.4); cursor: pointer;"></div>
+         style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1); opacity: 0.5; pointer-events: none; transition: none;">
+</div>
+
+<div id="ui-panel" style="display: none;">
+    <div class="zoom-controls">
+        <button class="btn" id="zoom-in">➕ 拡大</button>
+        <button class="btn" id="zoom-out">➖ 縮小</button>
+    </div>
+    <div class="controls">
+        <div></div><button class="btn" id="up">⬆️</button><div></div>
+        <button class="btn" id="left">⬅️</button><button class="btn" id="reset">Reset</button><button class="btn" id="right">➡️</button>
+        <div></div><button class="btn" id="down">⬇️</button><div></div>
+    </div>
+    <div id="shutter"></div>
+    <p style="text-align:center; color:#666;">図面を動かして位置を合わせてください</p>
 </div>
 
 <canvas id="canvas" style="display:none;"></canvas>
 
 <script>
-    const startBtn = document.getElementById('start-camera');
-    const container = document.getElementById('camera-container');
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const shutter = document.getElementById('shutter');
-    const guide = document.getElementById('guide');
+    let scale = 0.8;
+    let offsetX = 0;
+    let offsetY = 0;
 
-    startBtn.addEventListener('click', () => {{
+    const guide = document.getElementById('guide');
+    const container = document.getElementById('camera-container');
+    const uiPanel = document.getElementById('ui-panel');
+    const video = document.getElementById('video');
+
+    function updateTransform() {{
+        guide.style.transform = `translate(calc(-50% + ${{offsetX}}px), calc(-50% + ${{offsetY}}px)) scale(${{scale}})`;
+    }}
+
+    document.getElementById('start-camera').addEventListener('click', () => {{
         navigator.mediaDevices.getUserMedia({{ video: {{ facingMode: "environment" }}, audio: false }})
         .then(stream => {{
             video.srcObject = stream;
             container.style.display = 'block';
-            startBtn.style.display = 'none'; // 起動後はボタンを隠す
-        }})
-        .catch(err => {{
-            alert("カメラを起動できません。ブラウザの権限設定を確認してください。");
+            uiPanel.style.display = 'block';
+            document.getElementById('start-camera').style.display = 'none';
         }});
     }});
 
-    shutter.addEventListener('click', () => {{
+    // 移動・サイズ変更イベント
+    document.getElementById('zoom-in').onclick = () => {{ scale += 0.05; updateTransform(); }};
+    document.getElementById('zoom-out').onclick = () => {{ scale -= 0.05; updateTransform(); }};
+    document.getElementById('up').onclick = () => {{ offsetY -= 10; updateTransform(); }};
+    document.getElementById('down').onclick = () => {{ offsetY += 10; updateTransform(); }};
+    document.getElementById('left').onclick = () => {{ offsetX -= 10; updateTransform(); }};
+    document.getElementById('right').onclick = () => {{ offsetX += 10; updateTransform(); }};
+    document.getElementById('reset').onclick = () => {{ scale = 0.8; offsetX = 0; offsetY = 0; updateTransform(); }};
+
+    document.getElementById('shutter').onclick = () => {{
+        const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        if (guide.src && guide.src.includes('base64')) {{
-            const gw = canvas.width * 0.8;
-            const gh = guide.naturalHeight * (gw / guide.naturalWidth);
-            ctx.globalAlpha = 0.5;
-            ctx.drawImage(guide, (canvas.width - gw) / 2, (canvas.height - gh) / 2, gw, gh);
-        }}
-        
-        const link = document.createElement('a');
-        link.download = 'capture_' + Date.now() + '.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    }});
-</script>
-"""
-
-components.html(camera_ui_html, height=700)
-
-if st.button("🔄 ページを最新に更新"):
-    st.rerun()
+        canvas.width =
