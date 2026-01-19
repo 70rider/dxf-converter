@@ -39,25 +39,30 @@ if up:
 
 st.divider()
 
-# 3. HTML/JS コンポーネント (エラー防止のため極限まで短縮)
+# 3. HTML/JS (シャッターボタンを映像内に配置)
 st.header("2. 撮影と調整")
 gs = ""
 if os.path.exists(GP):
     with open(GP, "rb") as f:
         gs = "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
-# 1行が絶対に切れないように、短く結合します
 h = "<style>"
 h += ".grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; width:280px; margin:auto; }"
 h += ".btn { background:#eee; border:1px solid #999; padding:15px; border-radius:5px; text-align:center; cursor:pointer; font-weight:bold; }"
-h += "#sht { width:65px; height:65px; background:red; border-radius:50%; border:4px solid #fff; margin:15px auto; cursor:pointer; }"
+# 映像内ボタンの設定
+h += "#sht { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:70px; height:70px; "
+h += "background:rgba(255, 255, 255, 0.4); border-radius:50%; border:5px solid rgba(255,255,255,0.7); "
+h += "cursor:pointer; z-index:10; box-shadow: 0 0 10px rgba(0,0,0,0.5); }"
+h += "#sht:active { background:rgba(255, 0, 0, 0.6); }" # 押した時に赤くなる
 h += "</style>"
 
 h += "<button id='st' style='width:100%; padding:20px; background:red; color:#fff; border:none; border-radius:10px; font-size:18px;'>📸 カメラ起動</button>"
 
-h += "<div id='ar' style='display:none; position:relative; width:100%; background:#000; overflow:hidden; margin-top:10px;'>"
+# 映像エリアの中にボタン(sht)を移動
+h += "<div id='ar' style='display:none; position:relative; width:100%; background:#000; overflow:hidden; margin-top:10px; border-radius:15px;'>"
 h += "<video id='v' autoplay playsinline style='width:100%;'></video>"
 h += "<img id='g' src='REPLACE' style='position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.8); opacity:0.5; pointer-events:none;'>"
+h += "<div id='sht'></div>" # ボタンをここに追加
 h += "</div>"
 
 h += "<div id='box' style='margin-top:20px;'>"
@@ -67,7 +72,7 @@ h += "<div class='grid'>"
 h += "<div></div><div class='btn' id='u'>⬆️</div><div></div>"
 h += "<div class='btn' id='l'>⬅️</div><div class='btn' id='rs'>Reset</div><div class='btn' id='r'>➡️</div>"
 h += "<div></div><div class='btn' id='d'>⬇️</div><div></div></div>"
-h += "<div id='sht'></div></div>"
+h += "</div>"
 h += "<canvas id='c' style='display:none;'></canvas>"
 
 h += "<script>"
