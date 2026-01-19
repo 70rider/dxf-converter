@@ -19,7 +19,7 @@ if not os.path.exists(GP):
 
 st.title("DXFカメラツール")
 
-# 2. DXF変換
+# 2. DXF変換ロジック
 up = st.file_uploader("DXFを選択", type=['dxf'])
 if up:
     try:
@@ -38,7 +38,7 @@ if up:
         st.success("図面保存完了")
     except Exception as e: st.error(f"Error: {e}")
 
-# 3. HTML (合成計算を「画面座標系」から「カメラ座標系」へ変換)
+# 3. HTML/JS（保存サイズを画面に100%合わせるロジック）
 gs = ""
 if os.path.exists(GP):
     with open(GP, "rb") as f:
@@ -54,8 +54,11 @@ h += "<div id='ar' style='display:none;position:relative;width:100%;background:#
 h += "<video id='v' autoplay playsinline style='width:100%;'></video>"
 h += "<img id='g' src='REPLACE' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.8);opacity:0.5;pointer-events:none;'>"
 h += "<div id='sht'></div></div>"
-h += "<div style='margin-top:20px;'><div style='display:flex;justify-content:center;gap:10px;margin-bottom:10px;'><div class='btn' id='zi'>➕ 拡大</div><div class='btn' id='zo'>➖ 縮小</div></div>"
-h += "<div class='grid'><div></div><div class='btn' id='u'>⬆️</div><div></div><div class='btn' id='l'>⬅️</div><div class='btn' id='rs'>Reset</div><div class='btn' id='r'>➡️</div><div></div><div class='btn' id='d'>⬇️</div><div></div></div></div>"
+h += "<div style='margin-top:20px;'><div style='display:flex;justify-content:center;gap:10px;margin-bottom:10px;'>"
+h += "<div class='btn' id='zi'>➕ 拡大</div><div class='btn' id='zo'>➖ 縮小</div></div>"
+h += "<div class='grid'><div></div><div class='btn' id='u'>⬆️</div><div></div>"
+h += "<div class='btn' id='l'>⬅️</div><div class='btn' id='rs'>Reset</div><div class='btn' id='r'>➡️</div>"
+h += "<div></div><div class='btn' id='d'>⬇️</div><div></div></div></div>"
 h += "<canvas id='c' style='display:none;'></canvas><script>"
 h += "let s=0.8,x=0,y=0;const g=document.getElementById('g'),v=document.getElementById('v'),ar=document.getElementById('ar'),st=document.getElementById('st');"
 h += "function up(){g.style.transform='translate(calc(-50% + '+x+'px),calc(-50% + '+y+'px)) scale('+s+')';}"
@@ -65,22 +68,20 @@ h += "document.getElementById('u').onclick=()=>{y-=15;up();}; document.getElemen
 h += "document.getElementById('l').onclick=()=>{x-=15;up();}; document.getElementById('r').onclick=()=>{x+=15;up();};"
 h += "document.getElementById('rs').onclick=()=>{s=0.8;x=0;y=0;up();};"
 
-# 【重要】撮影・合成ロジック
+# 保存時の計算ロジック（ここを根本から修正）
 h += "document.getElementById('sht').onclick=()=>{const c=document.getElementById('c'),t=c.getContext('2d');"
-h += "c.width=v.videoWidth;c.height=v.videoHeight;t.drawImage(v,0,0);"
+h += "const vw=v.videoWidth, vh=v.videoHeight; c.width=vw; c.height=vh; t.drawImage(v,0,0);"
 h += "if(g.src.includes('base64')){"
-# 1. 画面上の表示倍率（画面幅に対するカメラ解像度の比）を算出
-h += "let ratio = v.videoWidth / ar.offsetWidth;"
-# 2. ガイド画像の元のサイズを取得
-h += "let nw = g.naturalWidth; let nh = g.naturalHeight;"
-# 3. 保存時の描画サイズを計算（基本サイズ × 拡大率s × 比率ratio）
-# ※ 画面上で「scale(0.8)」が基準なので、それを考慮
-h += "let drawW = (ar.offsetWidth * s) * ratio;"
-h += "let drawH = nh * (drawW / nw);"
-# 4. 中心座標を計算（移動分x, yを比率で補正）
-h += "let offX = (c.width / 2) + (x * ratio) - (drawW / 2);"
-h += "let offY = (c.height / 2) + (y * ratio) - (drawH / 2);"
-h += "t.globalAlpha=0.5; t.drawImage(g, offX, offY, drawW, drawH);}"
+# 画面の幅とカメラの解像度の比率を計算
+h += "  let ratio = vw / ar.offsetWidth;"
+# ガイドの「現在の画面上でのサイズ」を算出し、それを比率で写真サイズに変換
+h += "  let finalW = (ar.offsetWidth * s) * ratio;"
+h += "  let finalH = g.naturalHeight * (finalW / g.naturalWidth);"
+# 座標の計算（画面中央を基準に移動量を加算）
+h += "  let drawX = (vw / 2) + (x * ratio) - (finalW / 2);"
+h += "  let drawY = (vh / 2) + (y * ratio) - (finalH / 2);"
+h += "  t.globalAlpha=0.5; t.drawImage(g, drawX, drawY, finalW, finalH);"
+h += "}"
 h += "const a=document.createElement('a');a.download='pic.png';a.href=c.toDataURL('image/png');a.click();};</script>"
 
 components.html(h.replace("REPLACE", gs), height=850)
