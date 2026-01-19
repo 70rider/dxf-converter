@@ -19,7 +19,7 @@ if not os.path.exists(GP):
 
 st.title("DXFカメラツール")
 
-# 2. 変換ロジック
+# 2. 変換
 up = st.file_uploader("DXFを選択", type=['dxf'])
 if up:
     try:
@@ -38,17 +38,24 @@ if up:
         st.success("図面保存完了")
     except Exception as e: st.error(f"Error: {e}")
 
-# 3. HTML/JSコンポーネント
+# 3. HTML (1行を短く分割)
 gs = ""
 if os.path.exists(GP):
     with open(GP, "rb") as f:
         gs = "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
-# 短い文字列結合で構成
-h = "<style>.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;width:280px;margin:auto;}"
-h += ".btn{background:#eee;border:1px solid #999;padding:15px;border-radius:5px;text-align:center;cursor:pointer;font-weight:bold;}"
-h += "#sht{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:70px;height:70px;background:rgba(255,255,255,0.4);border-radius:50%;border:5px solid #fff;z-index:10;}</style>"
-h += "<button id='st' style='width:100%;padding:20px;background:red;color:#fff;border:none;border-radius:10px;'>📸 カメラ起動</button>"
-h += "<div id='ar' style='display:none;position:relative;width:100%;background:#000;overflow:hidden;margin-top:10px;border-radius:15px;'>"
-h += "<video id='v' autoplay playsinline style='width:100%;'></video>"
-h += "<img id='g' src='REPLACE' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.8);opacity:0.5;pointer-events:none
+h = "<style>"
+h += ".grid{display:grid;grid-template-columns:1fr 1fr 1fr;"
+h += "gap:5px;width:280px;margin:auto;}"
+h += ".btn{background:#eee;border:1px solid #999;padding:15px;"
+h += "border-radius:5px;text-align:center;cursor:pointer;"
+h += "font-weight:bold;}"
+h += "#sht{position:absolute;bottom:20px;left:50%;"
+h += "transform:translateX(-50%);width:70px;height:70px;"
+h += "background:rgba(255,255,255,0.4);border-radius:50%;"
+h += "border:5px solid #fff;z-index:10;}"
+h += "</style>"
+h += "<button id='st' style='width:100%;padding:20px;"
+h += "background:red;color:#fff;border:none;"
+h += "border-radius:10px;'>📸 カメラ起動</button>"
+h
