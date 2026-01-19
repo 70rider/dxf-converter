@@ -19,7 +19,7 @@ if not os.path.exists(GP):
 
 st.title("DXFカメラツール")
 
-# 2. 変換
+# 2. DXF変換
 up = st.file_uploader("DXFを選択", type=['dxf'])
 if up:
     try:
@@ -38,57 +38,44 @@ if up:
         st.success("図面保存完了")
     except Exception as e: st.error(f"Error: {e}")
 
-# 3. HTML (合成ロジック修正)
+# 3. HTML (合成計算の修正)
 gs = ""
 if os.path.exists(GP):
     with open(GP, "rb") as f:
         gs = "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
 h = "<style>"
-h += ".grid{display:grid;grid-template-columns:1fr 1fr 1fr;"
-h += "gap:5px;width:280px;margin:auto;}"
-h += ".btn{background:#eee;border:1px solid #999;padding:15px;"
-h += "border-radius:5px;text-align:center;cursor:pointer;font-weight:bold;}"
-h += "#sht{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);"
-h += "width:70px;height:70px;background:rgba(255,255,255,0.4);"
-h += "border-radius:50%;border:5px solid #fff;z-index:10;}"
+h += ".grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;width:280px;margin:auto;}"
+h += ".btn{background:#eee;border:1px solid #999;padding:15px;border-radius:5px;text-align:center;cursor:pointer;font-weight:bold;}"
+h += "#sht{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:75px;height:75px;background:rgba(255,255,255,0.4);border-radius:50%;border:5px solid #fff;z-index:10;}"
 h += "</style>"
-h += "<button id='st' style='width:100%;padding:20px;background:red;"
-h += "color:#fff;border:none;border-radius:10px;'>📸 カメラ起動</button>"
-h += "<div id='ar' style='display:none;position:relative;width:100%;"
-h += "background:#000;overflow:hidden;margin-top:10px;border-radius:15px;'>"
+h += "<button id='st' style='width:100%;padding:20px;background:red;color:#fff;border:none;border-radius:10px;'>📸 カメラ起動</button>"
+h += "<div id='ar' style='display:none;position:relative;width:100%;background:#000;overflow:hidden;margin-top:10px;border-radius:15px;'>"
 h += "<video id='v' autoplay playsinline style='width:100%;'></video>"
-h += "<img id='g' src='REPLACE' style='position:absolute;top:50%;left:50%;"
-h += "transform:translate(-50%,-50%) scale(0.8);opacity:0.5;pointer-events:none;'>"
+h += "<img id='g' src='REPLACE' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.8);opacity:0.5;pointer-events:none;'>"
 h += "<div id='sht'></div></div>"
-h += "<div style='margin-top:20px;'><div style='display:flex;justify-content:center;gap:10px;'>"
-h += "<div class='btn' id='zi'>➕ 拡大</div><div class='btn' id='zo'>➖ 縮小</div></div>"
-h += "<div class='grid'><div></div><div class='btn' id='u'>⬆️</div><div></div>"
-h += "<div class='btn' id='l'>⬅️</div><div class='btn' id='rs'>Reset</div>"
-h += "<div class='btn' id='r'>➡️</div><div></div><div class='btn' id='d'>⬇️</div>"
-h += "<div></div></div></div><canvas id='c' style='display:none;'></canvas>"
-h += "<script>"
-h += "let s=0.8,x=0,y=0;const g=document.getElementById('g'),v=document.getElementById('v');"
-h += "const ar=document.getElementById('ar'),st=document.getElementById('st');"
+h += "<div style='margin-top:20px;'><div style='display:flex;justify-content:center;gap:10px;margin-bottom:10px;'><div class='btn' id='zi'>➕ 拡大</div><div class='btn' id='zo'>➖ 縮小</div></div>"
+h += "<div class='grid'><div></div><div class='btn' id='u'>⬆️</div><div></div><div class='btn' id='l'>⬅️</div><div class='btn' id='rs'>Reset</div><div class='btn' id='r'>➡️</div><div></div><div class='btn' id='d'>⬇️</div><div></div></div></div>"
+h += "<canvas id='c' style='display:none;'></canvas><script>"
+h += "let s=0.8,x=0,y=0;const g=document.getElementById('g'),v=document.getElementById('v'),ar=document.getElementById('ar'),st=document.getElementById('st');"
 h += "function up(){g.style.transform='translate(calc(-50% + '+x+'px),calc(-50% + '+y+'px)) scale('+s+')';}"
-h += "st.onclick=()=>{navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920}}})"
-h += ".then(m=>{v.srcObject=m;ar.style.display='block';st.style.display='none';});};"
-h += "document.getElementById('zi').onclick=()=>{s+=0.05;up();};"
-h += "document.getElementById('zo').onclick=()=>{s-=0.05;up();};"
-h += "document.getElementById('u').onclick=()=>{y-=10;up();};"
-h += "document.getElementById('d').onclick=()=>{y+=10;up();};"
-h += "document.getElementById('l').onclick=()=>{x-=10;up();};"
-h += "document.getElementById('r').onclick=()=>{x+=10;up();};"
+h += "st.onclick=()=>{navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920}}}).then(m=>{v.srcObject=m;ar.style.display='block';st.style.display='none';});};"
+h += "document.getElementById('zi').onclick=()=>{s+=0.05;up();}; document.getElementById('zo').onclick=()=>{s-=0.05;up();};"
+h += "document.getElementById('u').onclick=()=>{y-=10;up();}; document.getElementById('d').onclick=()=>{y+=10;up();};"
+h += "document.getElementById('l').onclick=()=>{x-=10;up();}; document.getElementById('r').onclick=()=>{x+=10;up();};"
 h += "document.getElementById('rs').onclick=()=>{s=0.8;x=0;y=0;up();};"
+
+# 保存時のスケール計算ロジック
 h += "document.getElementById('sht').onclick=()=>{const c=document.getElementById('c'),t=c.getContext('2d');"
 h += "c.width=v.videoWidth;c.height=v.videoHeight;t.drawImage(v,0,0);"
-h += "if(g.src.includes('base64')){ "
-# ここが修正ポイント：比率(rt)を計算して座標とサイズを補正
-h += "let rt=v.videoWidth/ar.offsetWidth; let fW=c.width*s; let fH=g.naturalHeight*(fW/g.naturalWidth);"
-h += "let cX=(c.width-fW)/2+(x*rt); let cY=(c.height-fH)/2+(y*rt);"
-h += "t.globalAlpha=0.5; t.drawImage(g,cX,cY,fW,fH);} "
-h += "const a=document.createElement('a');a.download='pic.png';a.href=c.toDataURL();a.click();};"
-h += "</script>"
+h += "if(g.src.includes('base64')){"
+h += "let ratio = v.videoWidth / ar.offsetWidth;"
+h += "let drawW = c.width * s;"
+h += "let drawH = g.naturalHeight * (drawW / g.naturalWidth);"
+h += "let offX = (c.width - drawW) / 2 + (x * ratio);"
+h += "let offY = (c.height - drawH) / 2 + (y * ratio);"
+h += "t.globalAlpha=0.5; t.drawImage(g, offX, offY, drawW, drawH);}"
+h += "const a=document.createElement('a');a.download='pic.png';a.href=c.toDataURL();a.click();};</script>"
 
 components.html(h.replace("REPLACE", gs), height=850)
 if st.button("🔄 表示を更新"): st.rerun()
