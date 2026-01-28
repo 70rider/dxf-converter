@@ -15,37 +15,40 @@ if not os.path.exists(SD): os.makedirs(SD)
 GP = os.path.join(SD, "guide_ar.png")
 
 st.set_page_config(page_title="DXF-AR", layout="wide")
-st.title("🏗️ DXF マーカーAR (サイズ調整機能付)")
+st.title("🏗️ DXF マーカーAR (透過精度向上版)")
 
-# 2. DXF変換 (白黒反転 ＋ 透明化)
+# 2. DXF変換 (高度な透明化処理)
 up = st.file_uploader("DXFを選択", type=['dxf'])
 if up:
     try:
         doc, aud = recover.read(io.BytesIO(up.getvalue()))
         if aud.has_errors: aud.fix()
-        fig = plt.figure(figsize=(10,10))
+        fig = plt.figure(figsize=(12,12)) # 解像度を少し上げる
         ax = fig.add_axes([0,0,1,1])
         Frontend(RenderContext(doc), MatplotlibBackend(ax)).draw_layout(doc.modelspace())
         buf = io.BytesIO()
         fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
         plt.close(fig)
         
+        # --- 画像加工：輝度ベースの透明化 ---
         img = Image.open(buf).convert("RGB")
-        inv_img = ImageOps.invert(img)
-        rgba_img = inv_img.convert("RGBA")
-        datas = rgba_img.getdata()
-        new_data = []
-        for item in datas:
-            if item[0] < 50 and item[1] < 50 and item[2] < 50:
-                new_data.append((255, 255, 255, 0))
-            else:
-                new_data.append(item)
-        rgba_img.putdata(new_data)
+        # 1. 白黒反転（線を白くする）
+        img = ImageOps.invert(img)
+        
+        # 2. グレースケール化して「マスク（型）」を作る
+        mask = img.convert("L") 
+        
+        # 3. アルファチャンネルとしてマスクを適用
+        # 線（白い部分）は不透明、背景（黒い部分）は透明になる
+        rgba_img = img.convert("RGBA")
+        rgba_img.putalpha(mask)
+        
+        # 4. 保存（念のため背景をクリーンアップ）
         rgba_img.save(GP)
-        st.success("✅ AR図面の準備完了")
+        st.success("✅ 図面の透過処理を完了しました")
     except Exception as e: st.error(f"Error: {e}")
 
-# 3. AR.js + UI操作の実装
+# 3. AR.js 実装
 gs = ""
 if os.path.exists(GP):
     with open(GP, "rb") as f:
@@ -57,9 +60,8 @@ if gs:
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <div style="position: fixed; top: 10px; left: 10px; z-index: 1000; display: flex; gap: 10px;">
-        <button id="btn-in" style="padding: 15px; font-size: 20px; border-radius: 10px; background: white;">➕ 拡大</button>
-        <button id="btn-out" style="padding: 15px; font-size: 20px; border-radius: 10px; background: white;">➖ 縮小</button>
-        <button id="btn-reset" style="padding: 15px; font-size: 20px; border-radius: 10px; background: white;">🔄 Reset</button>
+        <button id="btn-in" style="padding: 15px; font-size: 18px; border-radius: 8px; background: white; border: 2px solid #333;">➕ 拡大</button>
+        <button id="btn-out" style="padding: 15px; font-size: 18px; border-radius: 8px; background: white; border: 2px solid #333;">➖ 縮小</button>
     </div>
 
     <body style="margin: 0; overflow: hidden;">
@@ -72,8 +74,9 @@ if gs:
                          src="#layer" 
                          position="0 0 0" 
                          rotation="-90 0 0" 
-                         width="2" height="2"
-                         transparent="true">
+                         width="4" height="4"
+                         transparent="true"
+                         alpha-test="0.5">
                 </a-image>
             </a-marker>
             <a-entity camera></a-entity>
@@ -82,27 +85,16 @@ if gs:
         <script>
             let currentScale = 1.0;
             const target = document.getElementById('target-img');
-            
             document.getElementById('btn-in').onclick = () => {{
-                currentScale += 0.2;
+                currentScale *= 1.2;
                 target.setAttribute('scale', `${{currentScale}} ${{currentScale}} ${{currentScale}}`);
             }};
-            
             document.getElementById('btn-out').onclick = () => {{
-                if (currentScale > 0.2) currentScale -= 0.2;
+                currentScale /= 1.2;
                 target.setAttribute('scale', `${{currentScale}} ${{currentScale}} ${{currentScale}}`);
-            }};
-
-            document.getElementById('btn-reset').onclick = () => {{
-                currentScale = 1.0;
-                target.setAttribute('scale', '1 1 1');
             }};
         </script>
     </body>
     """
     components.html(ar_html, height=700)
-    
-    with st.expander("👉 Hiroマーカー"):
-        st.image("https://ar-js-org.github.io/AR.js/data/images/hiro.png", width=200)
-else:
-    st.write("DXFをアップロードしてください。")
+    st.image("https://ar-js-org.github.io/AR.js/data/images/hiro.png", width=150, caption="このマーカーを映してください")
